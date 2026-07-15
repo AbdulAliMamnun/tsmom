@@ -273,3 +273,41 @@ An empty log is a claim that nothing was changed after results were seen.
 | Date | Change | Reason |
 |---|---|---|
 | — | *(none)* | Initial commit, before any results. |
+| 2026-07-15 | **Disclosure (not a change): the pre-registered N=12 grid contains only 6 distinct strategies.** No parameter was added, removed, or re-tuned; N=12 stands as the pre-registered figure for every correction. What changed is our knowledge: the vt20/vt40 axis was found — *after* results — to be degenerate. See §8.1. | A design flaw in the grid, discovered post-hoc from the trial-return correlation matrix (Finding 5). Recorded here so that the empty log does not falsely claim nothing was learned about the grid after results were seen. |
+
+### 8.1 The vt20/vt40 axis is degenerate under portfolio vol targeting
+
+**What was pre-registered.** §4 fixes the grid at **N = 12** = 3 lookbacks × 2 per-instrument
+vol targets (20%, 40%) × 2 rebalance frequencies. That N feeds every multiple-testing
+correction (DSR, Harvey-Liu).
+
+**The flaw.** The per-instrument vol target is exactly cancelled by the portfolio-level vol
+scaling. Doubling the target from 20% to 40% doubles every per-instrument position (positions
+scale as `vol_target / sigma`), which doubles the un-scaled portfolio's realised volatility,
+which halves the scalar that `scale_to_portfolio_vol` applies to hit the fixed 10% portfolio
+target. The two factors cancel **identically**, not approximately. The vt20 and vt40 members
+of each (lookback, rebalance) pair are therefore the *same strategy*, and the grid contains
+**6 distinct strategies, not 12**.
+
+**The evidence, and where it came from.** This was **not** found by reading the code — it was
+found in the **trial-return correlation matrix** (Run 5 / Finding 5). All six vt20/vt40 pairs
+sit at correlation **1.000000**, with net Sharpes identical to six decimal places (e.g.
+`lb252_vt20_rbM` and `lb252_vt40_rbM` both 0.706105). The eigenvalue effective-N estimators
+corroborate it: participation ratio ≈ 1.8, and the clustering count is exactly **6** at any
+distance threshold that merges near-perfect duplicates. The correlation matrix surfaced a
+structural fact that code review had missed — which is the same lesson as ENTRY 17: a property
+measured from the data catches what inspection does not.
+
+**Why this is a disclosure, not a grid change.**
+- **N = 12 is unchanged and still reported as the headline**, per §4: it is the number of
+  configurations actually run and the honest upper bound on the search. Every DSR/Harvey-Liu
+  correction continues to use N = 12. Nothing was added post-hoc, so no multiple-testing
+  penalty is being quietly relaxed.
+- **We now also report the true count of distinct strategies, 6**, alongside it. Reporting
+  both is the honest position: 12 overstates the number of independent bets (it double-counts
+  a redundant axis), and this is precisely the effective-N question Thread B exists to
+  quantify (ENTRY 16) — here answered exactly, for once, rather than estimated.
+- This is a flaw in grid *design*, discovered after results. It is logged as such rather than
+  silently corrected, because silently collapsing the grid to N = 6 after seeing the results
+  would itself be a post-hoc change to a pre-registered quantity — the thing this log exists
+  to prevent.

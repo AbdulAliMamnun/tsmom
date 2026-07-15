@@ -273,7 +273,7 @@ class TestFuturePoisoning:
         b = poisoned.iloc[:poison_at + 1]
 
         both = a.notna() & b.notna()
-        diff = float((a[both] - b[both]).abs().max()) if both.any().any() else 0.0
+        diff = float((a[both] - b[both]).abs().max().max()) if both.any().any() else 0.0
         assert diff == 0.0, (
             f"Poisoning the future at t={poison_at} changed the signal at or before t. "
             "Something reaches forward."
