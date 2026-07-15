@@ -194,6 +194,7 @@ def ablation(
     returns: pd.DataFrame,
     lookback: int,
     vol_target: float,
+    rebalance: str = "M",
     seed: int = config.SEED,
 ) -> pd.DataFrame:
     """Decompose performance into signal vs. volatility scaling.
@@ -220,45 +221,70 @@ def ablation(
 
     rng = np.random.default_rng(seed)
     tradeable = prices.notna()
-    vol = signals.ewma_volatility(returns)
-    vol_floor = vol.quantile(0.01, axis=0)
-    vol_safe = vol.clip(lower=vol_floor, axis=1)
+
+    # Per-instrument vol scaling, computed causally exactly as the real strategy does:
+    # floor_volatility uses an EXPANDING quantile, not a full-sample one. The earlier version
+    # of this function inlined `vol.quantile(0.01, axis=0)` here -- the very full-sample
+    # look-ahead floor_volatility exists to prevent (see signals.py::floor_volatility).
+    vol_safe = signals.floor_volatility(signals.ewma_volatility(returns))
+    per_instrument_scale = vol_target / vol_safe
+
     sig = signals.tsmom_signal(prices, lookback)
+    ones = pd.DataFrame(1.0, index=sig.index, columns=sig.columns)
 
-    arms = {}
-
-    # 1. The strategy.
-    arms["vol_scaled_tsmom"] = (sig * (vol_target / vol_safe)).where(tradeable, 0.0)
-
-    # 2. Signal, no scaling.
-    arms["unscaled_tsmom"] = sig.where(tradeable, 0.0)
-
-    # 3. Scaling, no signal. Random signs, resampled at the same frequency the real signal
-    #    changes, so the comparison isn't confounded by turnover.
-    random_sign = pd.DataFrame(
+    # Random signs for the "no signal" control. BUG (fixed): the previous version drew a fresh
+    # sign on EVERY bar, so this arm traded ~20x more than the real signal (12,807 vs 549
+    # annual turnover) -- which confounds the Sharpe comparison this ablation exists to make.
+    # The docstring is explicit that signs must be resampled at the frequency the real signal
+    # changes, so we draw signs and hold them between rebalance dates via the same schedule the
+    # strategy rebalances on. Turnover then lands in the same ballpark as the TSMOM arm.
+    random_raw = pd.DataFrame(
         rng.choice([-1.0, 1.0], size=sig.shape),
         index=sig.index,
         columns=sig.columns,
     )
-    arms["vol_scaled_random"] = (random_sign * (vol_target / vol_safe)).where(tradeable, 0.0)
+    random_sign = signals.apply_rebalance_schedule(random_raw, freq=rebalance)
 
-    # 4. Neither.
-    arms["long_only"] = pd.DataFrame(1.0, index=sig.index, columns=sig.columns).where(
-        tradeable, 0.0
-    )
+    # (base signal, apply per-instrument vol scaling?) -- the ONLY two things that vary between
+    # arms. Everything else is the shared pipeline below.
+    arm_specs = {
+        "vol_scaled_tsmom": (sig, True),           # 1. signal + scaling (the strategy)
+        "unscaled_tsmom": (sig, False),            # 2. signal, no per-instrument scaling
+        "vol_scaled_random": (random_sign, True),  # 3. scaling, no signal
+        "long_only": (ones, False),                # 4. neither
+    }
 
     rows = []
-    for name, pos in arms.items():
-        pos = pos.fillna(0.0)
+    for name, (base, scaled) in arm_specs.items():
+        pos = base * per_instrument_scale if scaled else base
+        pos = pos.where(tradeable, 0.0).fillna(0.0)
+
+        # BUG (fixed): the previous version fed these raw per-instrument positions straight to
+        # run_backtest, skipping portfolio vol scaling and the rebalance schedule. Arms ran at
+        # ~360% annualised vol and hit -100% drawdown -- a blown-up table, not a decomposition.
+        # Every arm must go through the SAME pipeline the real strategy uses.
+        pos = signals.scale_to_portfolio_vol(pos, returns)
+        pos = signals.apply_rebalance_schedule(pos, freq=rebalance)
+
         res = run_backtest(prices, pos, cost_model=config.BASE_COST, returns=returns)
+
+        annual_vol = float(res.net_returns.std() * np.sqrt(config.TRADING_DAYS_PER_YEAR))
+
+        # A correctly-piped arm sits near the portfolio target. If one blows past 3x that, it
+        # skipped the pipeline (Bug 1) -- fail loudly rather than print a plausible-looking
+        # table built from a 300%-vol arm.
+        assert annual_vol <= 3.0 * config.PORTFOLIO_VOL_TARGET, (
+            f"ablation arm {name!r} ran at {annual_vol:.1%} annualised vol, over 3x the "
+            f"{config.PORTFOLIO_VOL_TARGET:.0%} portfolio target -- it is not going through "
+            f"scale_to_portfolio_vol / apply_rebalance_schedule correctly"
+        )
+
         rows.append(
             {
                 "arm": name,
                 "gross_sharpe": metrics.sharpe_ratio(res.gross_returns),
                 "net_sharpe": metrics.sharpe_ratio(res.net_returns),
-                "annual_vol": float(
-                    res.net_returns.std() * np.sqrt(config.TRADING_DAYS_PER_YEAR)
-                ),
+                "annual_vol": annual_vol,
                 "max_drawdown": metrics.max_drawdown(res.net_returns),
                 "annual_turnover": res.annual_turnover,
             }
