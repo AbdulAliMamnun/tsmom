@@ -353,7 +353,7 @@ the full-sample headline 0.706.)
 
 ## Run 8 — Factor regression + per-sleeve + lag robustness + sub-period
 
-### Full-portfolio factor regression (FF5 + UMD, Newey-West lag 21, N = 6641)
+### Finding 8 — full-portfolio factor regression: UMD loads at t = 12.70 (FF5 + UMD, Newey-West lag 21, N = 6641)
 
 | term | coef | t-stat | p |
 |---|---|---|---|
@@ -368,7 +368,7 @@ the full-sample headline 0.706.)
 R² = **0.186**. A large UMD beta with modest R² is **strong co-movement, not reducibility** —
 this is not "the strategy is just UMD."
 
-### Per-sleeve (each sleeve separately vol-targeted to 10%)
+### Finding 9 — per-sleeve: UMD loads on all four sleeves, mechanical story refuted (each sleeve separately vol-targeted to 10%)
 
 | sleeve | alpha (ann) | alpha t | UMD coef | **UMD t** | R² |
 |---|---|---|---|---|---|
@@ -382,7 +382,7 @@ mechanical story (loading concentrated in the 7 equity ETFs, since UMD is a US e
 is **refuted**: there is no mechanical channel by which a US-equity-momentum factor should
 price a trend strategy trading Swiss francs.
 
-### Alpha robustness to Newey-West lag (point estimate lag-invariant at 3.97%/yr)
+### Finding 10 — alpha significance is Newey-West-lag-dependent (point estimate lag-invariant at 3.97%/yr)
 
 | lag | alpha t | p | passes 5% |
 |---|---|---|---|
@@ -412,6 +412,203 @@ Finding 1 full-sample-statistic leak recurring in a new place.
 
 ---
 
+## Run 9 — The UMD investigation (Step 7)
+
+Interrogating Finding 9 (UMD loads on all four sleeves, currency t = 7.31). **Numbers only;
+interpretation is deferred to the author per STEP_7 §11.** Every table below is produced by
+`scripts/run_umd_investigation.py`. Live-ETF start = **2007-03-01** (max over sleeves of
+first-active date, driven by the currency sleeve). Windows: full / live (≥ 2007-03-01) /
+pre (< 2007-03-01).
+
+### §2 Data verification — the backfill problem
+
+Ticker inception (`first_tradeable` trails `first_price` by ~one year of accumulated history;
+`any_data_before_first_valid` is **False for all 25 tickers** — no pre-inception data):
+
+| sleeve | ticker | first_price | first_tradeable | n_valid |
+|---|---|---|---|---|
+| equity | SPY / QQQ / EWJ | 2000-01-03 | 2001-03-12 | 6671 |
+| equity | IWM | 2000-05-26 | 2001-08-03 | 6570 |
+| equity | EFA | 2001-08-27 | 2002-11-07 | 6255 |
+| equity | EEM | 2003-04-14 | 2004-06-22 | 5849 |
+| equity | FXI | 2004-10-08 | 2005-12-14 | 5474 |
+| fixed_income | TLT / IEF / SHY / LQD | 2002-07-30 | 2003-10-06 | 6027 |
+| fixed_income | TIP | 2003-12-05 | 2005-02-14 | 5685 |
+| fixed_income | HYG | 2007-04-11 | 2008-06-17 | 4845 |
+| commodity | GLD | 2004-11-18 | 2006-01-27 | 5445 |
+| commodity | DBC | 2006-02-06 | 2007-04-17 | 5140 |
+| commodity | USO | 2006-04-10 | 2007-06-19 | 5096 |
+| commodity | SLV | 2006-04-28 | 2007-07-09 | 5083 |
+| commodity | DBA | 2007-01-05 | 2008-03-14 | 4910 |
+| commodity | UNG | 2007-04-18 | 2008-06-24 | 4840 |
+| currency | FXE | 2005-12-12 | 2007-02-22 | 5177 |
+| currency | FXB / FXA / FXF | 2006-06-26 | 2007-09-04 | 5043 |
+| currency | FXY | 2007-02-13 | 2008-04-22 | 4884 |
+| currency | UUP | 2007-03-01 | 2008-05-07 | 4873 |
+
+Date alignment: prices 2000-01-03 → 2026-07-14; French factors 1963-07-01 → **2026-05-29**;
+usable overlap 2000-01-03 → 2026-05-29 (regressions trim to the overlap, hence n = 6641 daily).
+
+Currency within-sleeve correlation (raw daily returns): **UUP is the inverse dollar trade**.
+
+| | FXE | FXY | FXB | FXA | FXF | UUP |
+|---|---|---|---|---|---|---|
+| FXE | 1.00 | 0.30 | 0.63 | 0.58 | 0.69 | **−0.93** |
+| FXY | 0.30 | 1.00 | 0.17 | 0.05 | 0.43 | −0.44 |
+| FXB | 0.63 | 0.17 | 1.00 | 0.56 | 0.43 | −0.69 |
+| FXA | 0.58 | 0.05 | 0.56 | 1.00 | 0.37 | −0.59 |
+| FXF | 0.69 | 0.43 | 0.43 | 0.37 | 1.00 | −0.71 |
+| UUP | −0.93 | −0.44 | −0.69 | −0.59 | −0.71 | 1.00 |
+
+### §1 Frequency — full portfolio on UMD (univariate), daily vs monthly
+
+| window | freq | beta | t | p | corr | **R²** | n |
+|---|---|---|---|---|---|---|---|
+| full | daily | 0.258 | 12.31 | 0.000 | 0.391 | 0.153 | 6641 |
+| full | monthly | 0.219 | 5.21 (NW3) / 6.67 (OLS) | 0.000 | 0.352 | **0.124** | 317 |
+| live | daily | 0.232 | 13.08 | 0.000 | 0.370 | 0.137 | 4843 |
+| live | monthly | 0.242 | 5.36 (NW3) / 5.64 (OLS) | 0.000 | 0.349 | **0.122** | 231 |
+
+### §1 + §3 Per-sleeve on UMD (univariate), daily vs monthly (full window)
+
+| sleeve | daily t | daily R² | **monthly R²** | monthly NW(3) t | monthly OLS t | monthly n |
+|---|---|---|---|---|---|---|
+| equity | 9.83 | 0.124 | 0.091 | 4.52 | 5.62 | 317 |
+| fixed_income | 8.00 | 0.015 | 0.011 | 2.16 | 1.83 | 317 |
+| commodity | 10.16 | 0.031 | 0.035 | 3.54 | 3.36 | 317 |
+| **currency** | 9.36 | 0.021 | **0.026** | 3.31 | 2.89 | 317 |
+
+Live-ETF window monthly R²: equity 0.054, fixed_income 0.029, commodity 0.065, **currency
+0.044**. So the currency sleeve's monthly R² against UMD is **2.6% (full) / 4.4% (live)**.
+
+### §3 Per-sleeve FF5 + UMD (reproduces Finding 9 daily), UMD coefficient
+
+| sleeve | daily beta | **daily t** | daily model R² | monthly beta | monthly t | monthly model R² |
+|---|---|---|---|---|---|---|
+| equity | 0.274 | 10.78 | 0.218 | 0.217 | 5.09 | 0.147 |
+| fixed_income | 0.070 | 5.14 | 0.018 | 0.036 | 1.28 | 0.034 |
+| commodity | 0.134 | 7.78 | 0.032 | 0.132 | 3.70 | 0.047 |
+| **currency** | 0.099 | **7.32** | 0.021 | 0.096 | 2.84 | 0.037 |
+
+### §4 Sleeve correlation matrix (monthly, full)
+
+| | equity | fixed_income | commodity | currency |
+|---|---|---|---|---|
+| equity | 1.00 | 0.11 | 0.11 | 0.22 |
+| fixed_income | 0.11 | 1.00 | 0.11 | 0.19 |
+| commodity | 0.11 | 0.11 | 1.00 | 0.30 |
+| currency | 0.22 | 0.19 | 0.30 | 1.00 |
+
+### §5 Pairwise sleeve regressions (monthly, full; y ~ x)
+
+| y | x | beta | t | p | corr | R² | n |
+|---|---|---|---|---|---|---|---|
+| equity | fixed_income | 0.099 | 1.71 | 0.088 | 0.114 | 0.013 | 319 |
+| equity | commodity | 0.094 | 2.11 | 0.035 | 0.105 | 0.011 | 319 |
+| equity | currency | 0.195 | 3.41 | 0.001 | 0.224 | 0.050 | 319 |
+| fixed_income | commodity | 0.109 | 2.00 | 0.046 | 0.106 | 0.011 | 319 |
+| fixed_income | currency | 0.194 | 3.05 | 0.002 | 0.194 | 0.038 | 319 |
+| commodity | currency | 0.292 | 3.75 | 0.000 | 0.301 | 0.090 | 319 |
+
+### §6 Leave-one-out common trend — `sleeve ~ UMD + other_three_avg` (monthly, full)
+
+| sleeve | UMD beta | **UMD t (p)** | other_three_avg beta | **other t (p)** | model R² |
+|---|---|---|---|---|---|
+| equity | 0.143 | 3.99 (0.0001) | 0.203 | 2.76 (0.006) | 0.115 |
+| fixed_income | 0.027 | 1.00 (0.32) | 0.290 | 2.79 (0.005) | 0.043 |
+| commodity | 0.074 | 2.56 (0.010) | 0.336 | 3.57 (0.0004) | 0.081 |
+| **currency** | 0.032 | **1.27 (0.20)** | 0.594 | **5.05 (<0.0001)** | 0.143 |
+
+### §7 Macro controls — currency-sleeve UMD coefficient (monthly)
+
+| control | umd_beta | umd_t | umd_p | model R² | endogenous |
+|---|---|---|---|---|---|
+| baseline (full) | 0.099 | 3.31 | 0.0009 | 0.026 | — |
+| + Mkt-RF | 0.098 | 2.94 | 0.0033 | 0.026 | no |
+| + UUP | 0.112 | 3.44 | 0.0006 | 0.038 | **yes** |
+| + TLT | 0.102 | 3.40 | 0.0007 | 0.031 | no |
+| + mkt_vol_lag | 0.099 | 3.32 | 0.0009 | 0.026 | no |
+| + credit (HYG−LQD) | 0.095 | 3.13 | 0.0017 | 0.026 | no |
+| + all jointly | 0.106 | 3.05 | 0.0023 | 0.065 | — |
+
+(Live window: baseline t = 3.55, all-joint t = 3.34.) The currency UMD coefficient stays
+significant (t > 3) under every control individually and jointly, full and live.
+
+### §8 Tail / regime — sleeve-vs-UMD correlation by condition (full)
+
+| sleeve | all | ex-top5% UMD | ex-bot5% UMD | **worst10% portfolio** | low-vol (daily) | high-vol (daily) |
+|---|---|---|---|---|---|---|
+| equity | 0.302 | 0.305 | 0.245 | 0.195 | 0.203 | 0.446 |
+| fixed_income | 0.103 | 0.114 | 0.096 | **−0.320** | 0.134 | 0.127 |
+| commodity | 0.186 | 0.165 | 0.208 | 0.113 | 0.201 | 0.213 |
+| currency | 0.161 | 0.148 | 0.176 | **−0.381** | 0.162 | 0.179 |
+
+### §9 Stability — per-sleeve monthly UMD regression by period (UMD t, R²)
+
+| period | equity | fixed_income | commodity | currency |
+|---|---|---|---|---|
+| first half | 3.74, 0.15 | 0.26, 0.00 | 1.99, 0.02 | 2.36, 0.02 |
+| second half | 2.45, 0.04 | 2.65, 0.05 | 4.58, 0.08 | 2.64, 0.04 |
+| pre-2008 | 2.67, 0.17 | −0.54, 0.00 | 1.20, 0.01 | 1.24, 0.01 |
+| 2008–2015 | 4.18, 0.07 | 1.98, 0.01 | 2.25, 0.04 | 2.47, 0.04 |
+| 2016–2026 | 2.43, 0.05 | 2.26, 0.05 | 3.85, 0.08 | 2.16, 0.04 |
+| backfilled (<live) | 2.62, 0.18 | −0.83, 0.00 | 0.81, 0.00 | n/a (no active data) |
+| live-ETF (≥live) | 4.20, 0.05 | 2.88, 0.03 | 3.81, 0.07 | 3.55, 0.04 |
+
+Rolling 3y/5y per-sleeve UMD betas → `results/figures/umd_beta_stability.png`.
+
+### §10 Economic importance
+
+Variance of each sleeve explained by UMD (R², monthly): full 0.9%–9.1%; live 2.9%–6.5%.
+**Portfolio monthly R² against UMD = 12.4% (full) / 12.2% (live)**, i.e. above every sleeve's.
+
+Portfolio risk, raw vs UMD-hedged (residual of portfolio ~ UMD, daily):
+
+| window | series | ann vol | ann return | max drawdown |
+|---|---|---|---|---|
+| full | raw | 0.112 | 0.077 | −0.2347 |
+| full | UMD-hedged | 0.103 | 0.068 | −0.2369 |
+| **live** | raw | **0.110** | **0.078** | −0.2347 |
+| **live** | UMD-hedged | **0.102** | **0.072** | −0.2366 |
+
+Hedging out UMD lowers vol (11.0 → 10.2, live) and return (7.8 → 7.2, live) and **does not
+improve max drawdown** (−0.2347 → −0.2366).
+
+Correlation of sleeve drawdown paths (do they lose money together?):
+
+| | equity | fixed_income | commodity | currency |
+|---|---|---|---|---|
+| equity | 1.00 | 0.22 | 0.19 | 0.42 |
+| fixed_income | 0.22 | 1.00 | 0.45 | 0.40 |
+| commodity | 0.19 | 0.45 | 1.00 | 0.45 |
+| currency | 0.42 | 0.40 | 0.45 | 1.00 |
+
+### Finding 11 — Finding 9's currency result was substantially a daily-frequency artifact
+
+Finding 9 reported the currency-sleeve UMD loading as **t = 7.31** and used it to call the
+cross-sleeve UMD result "genuinely strange." That t-statistic was computed on **~6,641
+overlapping DAILY observations of a strategy that rebalances MONTHLY on a 12-month signal**.
+Adjacent daily observations of such a strategy are almost the same observation; the effective
+sample is far smaller than 6,641, and the daily t is inflated accordingly. At the matched
+monthly frequency the currency loading is t = 2.84 (FF5+UMD) with a **monthly R² of 2.6%** —
+statistically present, economically small.
+
+**Finding 9 overstated the case.** The relationship is real but modest for currencies, not the
+striking result the daily t implied. And the cause is a methodological lapse the project itself
+names as a rule: `docs/STEP_7_SPEC.md` §11 states *"Do not report a t-statistic without its R².
+That failure is what produced Finding 9's apparent strangeness in the first place."* Run 8's
+per-sleeve table (which produced Finding 9) reported UMD t-stats **without** an R² per
+coefficient. Had the R² been shown alongside the t in Run 8 (currency ≈ 2%), the "strangeness"
+would have been visibly smaller from the outset. The rule was stated; the analysis that
+produced Finding 9 broke it — a distinct failure from the full-sample-statistic leak (ENTRY 17
+Finding 1), but the same underlying lesson the project keeps re-learning: the number that was
+omitted is the number that mattered.
+
+*(What the currency loading then IS — a common-trend proxy, an equity-overlap effect, something
+else — is interpretation, and stays with the author.)*
+
+---
+
 ## Status
 
 - [x] Ablation fix + vol assertion (Run 4)
@@ -420,7 +617,9 @@ Finding 1 full-sample-statistic leak recurring in a new place.
 - [x] DSR at N=12, effective-N + DSR-vs-N curve + flip point, Harvey-Liu haircuts (Run 7)
 - [x] Factor regression vs Ken French, per-sleeve, lag robustness, sub-period/vol-regime (Run 8)
 - [x] Figures → `results/figures/` and README (Step 6)
+- [x] UMD investigation — frequency/R², backfill, leave-one-out, macro controls, tails, stability (Run 9)
 - [ ] **Thread A and Thread B positions — deferred to the author, after the outputs exist**
+- [ ] **The UMD interpretation — deferred to the author (STEP_7 §11), after the tables exist**
 
 ---
 

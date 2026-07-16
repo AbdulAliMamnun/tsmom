@@ -496,6 +496,33 @@ def _bucket_stats(name: str, dimension: str, r: pd.Series) -> dict:
     }
 
 
+def causal_vol_regime_labels(
+    returns: pd.Series,
+    window: int = 63,
+    min_vol: int = 21,
+    expanding_min: int = 126,
+) -> pd.Series:
+    """Assign each bar a low/mid/high volatility-regime label, CAUSALLY.
+
+    The label at t uses trailing realised vol (a rolling std of returns strictly BEFORE t)
+    bucketed against EXPANDING tertile thresholds (computed from vol observed up to t only).
+    A full-sample tertile split would be look-ahead -- the ENTRY 17 Finding 1 hazard, which
+    has already recurred three times in this project. This single implementation is the one
+    place that logic lives; callers reuse it rather than reimplementing (and re-risking) it.
+
+    Verified causal by run_checks/tests via truncation invariance of the numbers it drives.
+    """
+    r = returns.dropna()
+    trailing_vol = r.rolling(window, min_periods=min_vol).std().shift(1)  # strictly before t
+    q_lo = trailing_vol.expanding(min_periods=expanding_min).quantile(1.0 / 3.0)
+    q_hi = trailing_vol.expanding(min_periods=expanding_min).quantile(2.0 / 3.0)
+    regime = pd.Series(index=r.index, dtype=object)
+    regime[trailing_vol <= q_lo] = "low_vol"
+    regime[(trailing_vol > q_lo) & (trailing_vol <= q_hi)] = "mid_vol"
+    regime[trailing_vol > q_hi] = "high_vol"
+    return regime
+
+
 def subperiod_analysis(net_returns: pd.Series) -> pd.DataFrame:
     """Performance by calendar era and by trailing volatility regime.
 
@@ -503,10 +530,7 @@ def subperiod_analysis(net_returns: pd.Series) -> pd.DataFrame:
     ETF inception), so 2000-2007 is pre-diversification and must be shown as such rather than
     blended into a single headline.
 
-    The volatility regime is assigned CAUSALLY: trailing realised vol (known before the bar it
-    labels) and EXPANDING tertile thresholds (computed from vol observed up to t only). Using
-    full-sample tertiles would be look-ahead -- the same hazard as ENTRY 17 Finding 1, where a
-    full-sample statistic used for bucketing quietly leaks.
+    The volatility regime is assigned causally via `causal_vol_regime_labels` (see there).
     """
     r = net_returns.dropna()
     rows = []
@@ -519,13 +543,7 @@ def subperiod_analysis(net_returns: pd.Series) -> pd.DataFrame:
             rows.append(_bucket_stats(name, "calendar", seg))
 
     # --- volatility regime (causal) ---
-    trailing_vol = r.rolling(63, min_periods=21).std().shift(1)  # known strictly before t
-    q_lo = trailing_vol.expanding(min_periods=126).quantile(1.0 / 3.0)
-    q_hi = trailing_vol.expanding(min_periods=126).quantile(2.0 / 3.0)
-    regime = pd.Series(index=r.index, dtype=object)
-    regime[trailing_vol <= q_lo] = "low_vol"
-    regime[(trailing_vol > q_lo) & (trailing_vol <= q_hi)] = "mid_vol"
-    regime[trailing_vol > q_hi] = "high_vol"
+    regime = causal_vol_regime_labels(r)
     for name in ("low_vol", "mid_vol", "high_vol"):
         seg = r[regime == name]
         if len(seg):

@@ -6,11 +6,12 @@ happened when it was subjected to the corrections most backtests skip.*
 > **Net Sharpe 0.706** (2000–2026, 25 ETFs, net of 5 bp/side).
 > It passes the Deflated Sharpe Ratio at **every** effective-N accounting tested (N = 1.8 to 12;
 > no flip point in range).
-> **It is also, substantially, cross-sectional-momentum beta** — the momentum factor (UMD)
-> loads at **t = 12.70**, leaving **3.97%/yr** of alpha whose significance depends on an
-> arbitrary HAC-lag choice (p = 0.0488 at lag 21; p = 0.0506 at lag 63).
+> **It also carries a real cross-sectional-momentum (UMD) exposure** — UMD explains ~**12% of
+> the portfolio's monthly variance** (the full-model daily loading is t = 12.70, but a daily
+> t on a monthly strategy overstates — see step 6), leaving **3.97%/yr** of alpha whose
+> significance depends on an arbitrary HAC-lag choice (p = 0.0488 at lag 21; p = 0.0506 at lag 63).
 >
-> A strategy can pass every multiple-testing correction and still be repackaged factor
+> A strategy can pass every multiple-testing correction and still carry meaningful factor
 > exposure. Those analyses ask orthogonal questions. **That is the finding.**
 
 Every number here traces to [`docs/RESULTS_LOG.md`](docs/RESULTS_LOG.md) (the lab notebook);
@@ -39,19 +40,23 @@ flowchart TB
 
 ## The chain
 
-Five steps, each a correct application of a standard method. The destination is far from
-where step 2 alone would leave you — and **step 2 is where most backtests stop**
+Six steps, each a correct application of a standard method — the sixth a correction to one of
+the project's own earlier findings. The destination is far from where step 2 alone would leave
+you — and **step 2 is where most backtests stop**
 ([`RESULTS_LOG.md` Open Question 9](docs/RESULTS_LOG.md#open-questions-stated-not-resolved)).
 
 ```mermaid
 flowchart LR
     S1["1 · Net Sharpe 0.706<br/>2000–2026, 5 bp/side"] --> S2["2 · Passes DSR at<br/>every effective-N<br/>no flip in 1–12"]
     S2 --> S3["3 · But UMD loads<br/>at t = 12.70"]
-    S3 --> S4["4 · Across ALL four sleeves<br/>currency t = 7.31<br/>→ mechanical story refuted"]
+    S3 --> S4["4 · Across ALL four sleeves<br/>currency t = 7.31 (daily)<br/>→ mechanical story refuted"]
     S4 --> S5["5 · Residual alpha 3.97%/yr<br/>p = 0.0488 → 0.0506<br/>significance is lag-dependent"]
+    S5 --> S6["6 · But t = 7.31 was a<br/>daily-frequency artifact<br/>monthly R² = 2.6%; currency UMD<br/>→ insignificant in leave-one-out"]
     STOP["most backtests<br/>stop here"] -.-> S2
+    S6 -.->|corrects| S4
     style S2 fill:#f5d76e,color:#1a1a1a,stroke:#b8860b,stroke-width:2px
     style STOP fill:#ffffff,stroke:#c0392b,color:#c0392b
+    style S6 fill:#2c7a7b,color:#fff,stroke:#1d5152,stroke-width:2px
 ```
 
 1. **Net Sharpe 0.706** over 26 years, net of 5 bp/side (gross 0.746; breakeven 92.3 bp/side,
@@ -74,7 +79,8 @@ flowchart LR
    separately vol-targeted to 10%), UMD is significant in **all four** sleeves — equity 10.77,
    commodity 7.77, currency 7.31, fixed income 5.12. UMD is a *US equity* factor; there is no
    mechanical channel by which it should price a trend strategy trading Swiss francs. The
-   "it's just the equity sleeve" explanation is refuted.
+   "it's just the equity sleeve" explanation is refuted. **⚠ These t-stats are on daily data —
+   step 6 corrects them.**
 
    ![UMD t-stat by sleeve — significant in all four](results/figures/umd_by_sleeve.png)
 
@@ -84,6 +90,36 @@ flowchart LR
    in full; not tuned to a lag that passes.
 
    ![Alpha t-stat vs Newey-West lag — crosses 5% at lag 63](results/figures/alpha_lag_robustness.png)
+
+6. **The correction: step 4's currency loading was substantially a daily-frequency artifact.**
+   The t = 7.31 was computed on ~6,641 *overlapping* daily observations of a strategy that
+   rebalances **monthly** on a **12-month** signal — adjacent days are nearly the same
+   observation, so the effective sample is far smaller and the daily t is inflated. At the
+   matched monthly frequency the currency loading is **t = 2.84 with a monthly R² of 2.6%**, and
+   once the other three sleeves are controlled for it is **insignificant** (leave-one-out
+   t = 1.27, p = 0.20). Finding 9 overstated the case. The thing that would have caught it is a
+   rule this project had already written down — *never report a t-statistic without its R²* —
+   and the analysis that produced Finding 9 broke it
+   ([Run 9 / Finding 11](docs/RESULTS_LOG.md#finding-11--finding-9s-currency-result-was-substantially-a-daily-frequency-artifact)).
+   Not every sleeve collapses this way: equity and commodity retain an independent UMD loading
+   in the same leave-one-out test.
+
+   ![Rolling 3y/5y UMD beta by sleeve](results/figures/umd_beta_stability.png)
+
+## Interpretation
+
+> **This section is the author's position, not a result.** Everything above and in
+> [`docs/RESULTS_LOG.md`](docs/RESULTS_LOG.md) is machinery and numbers; the machinery is
+> deliberately built to stop short of a conclusion (STEP_7 §11). What follows is what the
+> author makes of those numbers — a judgement, offered as such.
+
+The evidence rejects both extremes. The strategy is neither four independent bets nor four versions of the same momentum trade. UMD-related variation explains approximately 12% of the total portfolio's monthly returns, while explaining only 2.9%–6.5% of the individual sleeves. The concentration is therefore measurable but modest: approximately 88% of portfolio variation remains outside UMD.
+
+The relationship also differs by sleeve. For currencies, UMD acts as a proxy for the broader cross-asset trend component: its coefficient becomes insignificant once the other three sleeves are included. Fixed income shows a similar, although less conclusive, pattern. Equity retains an independent UMD loading, which is unsurprising because the equity sleeve and UMD share underlying equity exposure. Commodity trend also retains an independent UMD loading, despite having no comparable instrument overlap. That commodity result is the main unresolved finding and the strongest evidence that the relationship may extend beyond portfolio construction.
+
+Economically, the UMD exposure is not the portfolio's dominant risk. Hedging it reduces annualized volatility only from 11.0% to 10.2%, lowers return from 7.8% to 7.2%, and does not improve maximum drawdown. Therefore, the strategy remains meaningfully diversified, with a modest common momentum-related exposure that contributes to ordinary return and volatility but does not drive its worst losses.
+
+UMD should consequently not be described as either a universal cause or a uniform proxy across all four sleeves. It proxies for the common trend component in currencies, is directly related to the equity sleeve, and captures an additional unexplained component in commodities. Identifying the source of that commodity loading—whether it comes from particular ETFs, long-only risk exposure, volatility scaling, futures roll effects or a genuine cross-asset momentum mechanism—is the next research question.
 
 ## The strategy
 
@@ -194,9 +230,12 @@ discipline caught each. See [ENTRY 17](docs/REASONING_LOG.md#entry-17).
 
 ## Open questions (stated, not resolved)
 
-1. **Why does a long-short portfolio of US equities sorted on prior returns explain a trend
-   strategy trading Swiss francs at t = 7.31?** UMD prices all four sleeves including
-   currencies, where no mechanical channel exists. **This is unresolved.**
+1. **What is the source of the commodity sleeve's independent UMD loading?** The original
+   currency puzzle (t = 7.31) is largely resolved by step 6 and the [Interpretation](#interpretation):
+   at monthly frequency the currency loading is small and proxies for the common cross-asset
+   trend. But commodity trend retains an independent UMD loading despite no instrument overlap
+   with UMD — particular ETFs, long-only exposure, vol scaling, futures roll, or a genuine
+   cross-asset mechanism? **This is the remaining unresolved piece.**
 2. Does the residual alpha survive? It crosses the 5% line between HAC lags 21 and 63 — genuinely
    on the boundary, not clearly one side of it.
 3. Which estimand governs when walk-forward (a live-trading counterfactual) and CPCV (a
