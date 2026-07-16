@@ -4,3 +4,5 @@ __pycache__/
 data/raw/*.parquet
 results/tables/
 .DS_Store
+data/raw/*.csv
+data/raw/*.csv

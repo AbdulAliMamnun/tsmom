@@ -202,7 +202,7 @@ Results ([Run 6](docs/RESULTS_LOG.md#run-6--walk-forward--cpcv--pbo--embargo-thr
 The engine is verified by property tests, not by inspection: truncation invariance (compute
 `f(series)[t]` vs `f(series[:t])[t]`), future poisoning (NaN-out the future, nothing at or
 before *t* may change), and positive controls (a deliberately leaky function the suite *must*
-fail on). `run_checks.py` reports **33/33**; the pytest suite is **50/50**.
+fail on). `run_checks.py` reports **33/33**; the pytest suite is **62/62**.
 
 The claim is not "my engine is clean." It is *"here is the machinery that would tell me if it
 weren't, and here it is working."* **The suite caught a full-sample quantile in my own
@@ -249,7 +249,7 @@ discipline caught each. See [ENTRY 17](docs/REASONING_LOG.md#entry-17).
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 PYTHONPATH=src python3 run_checks.py            # 33/33 leak + engine checks
-PYTHONPATH=src python3 -m pytest -q             # 50/50
+PYTHONPATH=src python3 -m pytest -q             # 62/62
 PYTHONPATH=src python3 scripts/make_figures.py  # → results/figures/*.png
 ```
 
